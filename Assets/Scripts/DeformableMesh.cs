@@ -125,7 +125,7 @@ public class DeformableMesh : MonoBehaviour
     public int numIterations = 10;
     public bool bumpMapCompatible = true;
     public float drift = 0.0f;
-    public float brakeDistance = 0.1f;
+    public float brakeDistance = 0.01f;
     private Point[] points;
     private Point[] pointsPrevious;
     private Vector3[] forceAccumulator;
@@ -231,17 +231,30 @@ public class DeformableMesh : MonoBehaviour
     {
         Debug.Log("Collision detected at " + collision.transform.position + " with impulse " + collision.impulse);
 
-        Vector3 localPosition = transform.InverseTransformPoint(collision.transform.position);
-        Vector3 localImpulse = transform.InverseTransformVector(collision.impulse) * -1.0f;
+        int numContacts = collision.contactCount;
 
-        Debug.Log("Collision detected at " + localPosition + " with impulse " + localImpulse);
+        ContactPoint[] contactPoints = new ContactPoint[numContacts];
+            
+        collision.GetContacts(contactPoints);
+
+        //We don't want a collision with multiple contact points to be treated as multiple collisions, so we'll multiply the impulse at each contact point by a value that reflects the number of contact points
+        float contactPointsMultiplier = 1.0f / (float)numContacts;
+
+        
+        Vector3 localImpulse = transform.InverseTransformVector(collision.impulse) * -1.0f * contactPointsMultiplier;
 
         for (int i=0; i < points.Length; i++)
         {
-            float distance = Vector3.Distance(points[i].position, localPosition);
-            forceAccumulator[i] += localImpulse / (distance * distance);
-            Debug.Log(forceAccumulator[i]);
+            foreach (ContactPoint contactPoint in contactPoints)
+            {
+                Vector3 localPosition = transform.InverseTransformPoint(contactPoint.point);
+                float distance = Vector3.Distance(points[i].position, localPosition);
+                forceAccumulator[i] += localImpulse / (distance * distance);
+                Debug.Log(forceAccumulator[i]);
+            }
         }
+
+        Debug.Log("Contact points: " + collision.contactCount);
     }
 
     // Update is called once per frame
